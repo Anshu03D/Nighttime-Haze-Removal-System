@@ -1,0 +1,32 @@
+# ----------------------------
+# Python
+# ----------------------------
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# ----------------------------
+# Model Weights
+# ----------------------------
+weights/dehaze.pt
+results/dehaze/model/dehaze.pt
+
+# ----------------------------
+# Runtime Files
+# ----------------------------
+metrics/results.csv
+temp/
+
+# ----------------------------
+# Generated Results
+# ----------------------------
+results/dehaze/input/
+results/dehaze/output/
+results/dehaze/input_output/
+
+# ----------------------------
+# VS Code
+# ----------------------------
+.vscode/
