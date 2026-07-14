@@ -7,6 +7,7 @@ import time
 import pandas as pd
 
 from model_runner import run_dehaze
+from src.visualization.histogram import generate_histogram
 
 st.set_page_config(
     page_title="Nighttime Haze Removal",
@@ -137,94 +138,76 @@ if uploaded_file is not None:
             caption="Dehazed Image",
             use_container_width=True
         )
+        st.subheader("📈 Histogram Comparison")
 
-    def calculate_entropy(gray):
-        hist = cv2.calcHist(
-            [gray],
-            [0],
-            None,
-            [256],
-            [0, 256]
-        )
-        hist = hist.ravel()
-        hist = hist / hist.sum()
-        hist = hist[hist > 0]
-        entropy = -np.sum(hist * np.log2(hist))
-        return entropy
-
+st.image(
+    histogram_path,
+    use_container_width=True
+)
     # -------------------
-    # Metrics
+    # Image Evaluation
     # -------------------
 
     original_np = np.array(original)
     dehazed_np = np.array(dehazed)
-
-    original_gray = cv2.cvtColor(
-        original_np,
-        cv2.COLOR_RGB2GRAY
-    )
-
-    dehazed_gray = cv2.cvtColor(
-        dehazed_np,
-        cv2.COLOR_RGB2GRAY
-    )
-
-    original_brightness = np.mean(original_gray)
-    dehazed_brightness = np.mean(dehazed_gray)
-
-    brightness_gain = (
-        (
-            dehazed_brightness
-            - original_brightness
-        )
-        / max(original_brightness, 1)
-    ) * 100
-
-    original_contrast = np.std(original_gray)
-
-    dehazed_contrast = np.std(dehazed_gray)
-
-    contrast_gain = (
-    (
-        dehazed_contrast
-        - original_contrast
-    )
-    / max(original_contrast, 1)
-) * 100
-
-    entropy = calculate_entropy(
-    dehazed_gray
+    histogram_path = generate_histogram(
+    original_np,
+    dehazed_np
 )
 
+    metrics = evaluate_image(
+        original_image=original_np,
+        enhanced_image=dehazed_np,
+        processing_time=processing_time
+    )
     st.subheader("Performance Metrics")
 
-    m1, m2, m3, m4, m5 = st.columns(5)
+    st.subheader("📊 Image Quality Evaluation")
 
-    m1.metric(
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric(
         "Original Brightness",
-        f"{original_brightness:.2f}"
+        metrics["original_brightness"]
     )
 
-    m2.metric(
+        st.metric(
         "Enhanced Brightness",
-        f"{dehazed_brightness:.2f}"
+        metrics["enhanced_brightness"]
     )
 
-    m3.metric(
+    with col2:
+        st.metric(
         "Brightness Gain",
-        f"{brightness_gain:.2f}%"
+        f"{metrics['brightness_gain']}%"
     )
-    
-    m4.metric(
+
+        st.metric(
         "Contrast Gain",
-        f"{contrast_gain:.2f}%"
+        f"{metrics['contrast_gain']}%"
     )
 
-    m5.metric(
+    with col3:
+        st.metric(
         "Entropy",
-        f"{entropy:.2f}"
+        metrics["entropy"]
     )
 
+    st.metric(
+        "Sharpness",
+        metrics["sharpness"]
+    )
+
+    st.metric(
+    "Colorfulness",
+    metrics["colorfulness"]
+)
+
+    st.metric(
+    "Resolution",
+    metrics["resolution"]
+)
     # -------------------
     # Processing Time
     # -------------------
@@ -242,24 +225,28 @@ if uploaded_file is not None:
     buffer = io.BytesIO()
 
     dehazed.save(
-    buffer,
-    format="JPEG"
-)
+        buffer,
+        format="JPEG"
+    )
 
     st.download_button(
-    label="📥 Download Dehazed Image",
-    data=buffer.getvalue(),
-    file_name="dehazed_image.jpg",
-    mime="image/jpeg"
-)
+        label="📥 Download Dehazed Image",
+        data=buffer.getvalue(),
+        file_name="dehazed_image.jpg",
+        mime="image/jpeg"
+    )
+
     metrics_data = {
         "Image Name": uploaded_file.name,
-        "Original Brightness": round(original_brightness, 2),
-        "Enhanced Brightness": round(dehazed_brightness, 2),
-        "Brightness Gain (%)": round(brightness_gain, 2),
-        "Contrast Gain (%)": round(contrast_gain, 2),
-        "Entropy": round(entropy, 2),
-        "Processing Time (s)": processing_time
+        "Original Brightness": metrics["original_brightness"],
+        "Enhanced Brightness": metrics["enhanced_brightness"],
+        "Brightness Gain (%)": metrics["brightness_gain"],
+        "Contrast Gain (%)": metrics["contrast_gain"],
+        "Entropy": metrics["entropy"],
+        "Sharpness": metrics["sharpness"],
+        "Colorfulness": metrics["colorfulness"],
+        "Resolution": metrics["resolution"],
+        "Processing Time (s)": metrics["processing_time"]
     }
 
     csv_file = "metrics/results.csv"
