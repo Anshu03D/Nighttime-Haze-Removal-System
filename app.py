@@ -5,74 +5,118 @@ import cv2
 import numpy as np
 import time
 import pandas as pd
+import io
 
 from model_runner import run_dehaze
+from src.evaluation.metrics import evaluate_image
 from src.visualization.histogram import generate_histogram
 
+# -------------------------------------------------------
+# Streamlit Configuration
+# -------------------------------------------------------
+
 st.set_page_config(
-    page_title="Nighttime Haze Removal",
+    page_title="Nighttime Haze Removal System",
     page_icon="🌙",
     layout="wide"
 )
 
-st.sidebar.title("Project Information")
+# -------------------------------------------------------
+# Sidebar
+# -------------------------------------------------------
+
+st.sidebar.title("🌙 Project Information")
+
 st.sidebar.markdown("""
 ### Developer
-Snehanshu Daripa
+**Snehanshu Daripa**
 
 ### Institution
 Techno India College Of Technology
 
 ### Technology Stack
+
 - Python
 - PyTorch
 - Streamlit
 - OpenCV
-- GAPSF
-""")
+- NumPy
+- Pandas
+- Matplotlib
 
-st.sidebar.markdown("""
-### Nighttime Haze Removal System
-
-Research-based image enhancement system using a deep learning dehazing network.
+---
 
 ### Features
 
-✅ Nighttime Dehazing
+✅ Nighttime Image Dehazing
 
-✅ Visibility Enhancement
+✅ Deep Learning Enhancement
 
-✅ Brightness Analysis
+✅ Histogram Visualization
 
-✅ Contrast Analysis
+✅ Image Quality Metrics
 
-✅ Entropy Measurement
+✅ CSV Report Generation
 
-✅ Image Download
+✅ Download Enhanced Image
 
-### Developer
+---
 
-Final Year Project
+### Final Year Project
+Computer Science & Engineering
 """)
+
+# -------------------------------------------------------
+# Main Title
+# -------------------------------------------------------
 
 st.title("🌙 Nighttime Haze Removal System")
 
-with st.expander("Project Abstract"):
+st.markdown(
+"""
+Deep Learning based image enhancement system for removing
+nighttime haze and improving scene visibility.
+"""
+)
+
+# -------------------------------------------------------
+# Abstract
+# -------------------------------------------------------
+
+with st.expander("📄 Project Abstract"):
 
     st.write("""
-    This project enhances visibility in nighttime hazy images using
-    a deep learning based dehazing network. The system removes haze,
-    improves scene visibility, and evaluates image quality through
-    brightness, contrast, entropy, and processing time metrics.
-    """)
+This project enhances nighttime hazy images using a
+deep learning based dehazing network.
+
+The system performs:
+
+- Nighttime haze removal
+- Visibility enhancement
+- Histogram comparison
+- Image quality evaluation
+- Performance measurement
+- CSV logging
+""")
+
+# -------------------------------------------------------
+# Upload Image
+# -------------------------------------------------------
 
 uploaded_file = st.file_uploader(
-    "Upload a Nighttime Hazy Image",
+    "Upload Nighttime Hazy Image",
     type=["jpg", "jpeg", "png"]
 )
+
+# -------------------------------------------------------
+# Main Pipeline
+# -------------------------------------------------------
+
 if uploaded_file is not None:
 
     os.makedirs("temp/input", exist_ok=True)
+    os.makedirs("report_results/original", exist_ok=True)
+    os.makedirs("report_results/dehazed", exist_ok=True)
 
     input_path = os.path.join(
         "temp/input",
@@ -82,50 +126,71 @@ if uploaded_file is not None:
     with open(input_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
 
-    original = Image.open(input_path)
+    original = Image.open(input_path).convert("RGB")
 
-    start_time = time.time()
+    # -----------------------------------
+    # Run Model
+    # -----------------------------------
+
+    start_time = time.perf_counter()
 
     with st.spinner("Removing haze..."):
+
         output_path = run_dehaze(input_path)
 
-    end_time = time.time()
-    processing_time = round(end_time - start_time, 2)
+    end_time = time.perf_counter()
 
-    dehazed = Image.open(output_path)
+    processing_time = round(
+        end_time - start_time,
+        2
+    )
+
+    dehazed = Image.open(output_path).convert("RGB")
+
+    # -----------------------------------
+    # Gamma Correction
+    # -----------------------------------
 
     dehazed_np = np.array(dehazed)
 
     gamma = 0.7
 
     table = np.array([
-    ((i / 255.0) ** gamma) * 255
-    for i in np.arange(256)
+        ((i / 255.0) ** gamma) * 255
+        for i in np.arange(256)
     ]).astype("uint8")
 
     dehazed_np = cv2.LUT(
-    dehazed_np,
-    table
-)
+        dehazed_np,
+        table
+    )
 
     dehazed = Image.fromarray(
         dehazed_np
     )
+
+    # -----------------------------------
+    # Save Images
+    # -----------------------------------
+
     original.save(
-    f"report_results/original/{uploaded_file.name}"
-)
+        f"report_results/original/{uploaded_file.name}"
+    )
 
     dehazed.save(
-    f"report_results/dehazed/{uploaded_file.name}"
-)
+        f"report_results/dehazed/{uploaded_file.name}"
+    )
 
-    # -------------------
+    # -----------------------------------
     # Image Comparison
-    # -------------------
+    # -----------------------------------
+
+    st.subheader("🖼 Image Comparison")
 
     col1, col2 = st.columns(2)
 
     with col1:
+
         st.image(
             original,
             caption="Original Image",
@@ -133,94 +198,182 @@ if uploaded_file is not None:
         )
 
     with col2:
+
         st.image(
             dehazed,
-            caption="Dehazed Image",
+            caption="Enhanced Image",
             use_container_width=True
         )
-        st.subheader("📈 Histogram Comparison")
 
-st.image(
-    histogram_path,
-    use_container_width=True
-)
-    # -------------------
+    # -----------------------------------
     # Image Evaluation
-    # -------------------
+    # -----------------------------------
 
     original_np = np.array(original)
+
     dehazed_np = np.array(dehazed)
-    histogram_path = generate_histogram(
-    original_np,
-    dehazed_np
-)
 
     metrics = evaluate_image(
         original_image=original_np,
         enhanced_image=dehazed_np,
         processing_time=processing_time
     )
-    st.subheader("Performance Metrics")
+
+    histogram_path = generate_histogram(
+        original_np,
+        dehazed_np
+    )
+        # -----------------------------------
+    # Histogram
+    # -----------------------------------
+
+    st.subheader("📈 Histogram Comparison")
+
+    st.image(
+        histogram_path,
+        use_container_width=True
+    )
+
+    # -----------------------------------
+    # Image Quality Metrics
+    # -----------------------------------
 
     st.subheader("📊 Image Quality Evaluation")
 
-    col1, col2, col3 = st.columns(3)
+    row1_col1, row1_col2, row1_col3 = st.columns(3)
 
-    with col1:
-        st.metric(
-        "Original Brightness",
-        metrics["original_brightness"]
-    )
+    with row1_col1:
 
         st.metric(
-        "Enhanced Brightness",
-        metrics["enhanced_brightness"]
-    )
-
-    with col2:
-        st.metric(
-        "Brightness Gain",
-        f"{metrics['brightness_gain']}%"
-    )
+            "Original Brightness",
+            metrics["original_brightness"]
+        )
 
         st.metric(
-        "Contrast Gain",
-        f"{metrics['contrast_gain']}%"
-    )
+            "Enhanced Brightness",
+            metrics["enhanced_brightness"]
+        )
 
-    with col3:
+    with row1_col2:
+
         st.metric(
-        "Entropy",
-        metrics["entropy"]
-    )
+            "Brightness Gain",
+            f"{metrics['brightness_gain']}%"
+        )
 
-    st.metric(
-        "Sharpness",
-        metrics["sharpness"]
-    )
+        st.metric(
+            "Contrast Gain",
+            f"{metrics['contrast_gain']}%"
+        )
 
-    st.metric(
-    "Colorfulness",
-    metrics["colorfulness"]
-)
+    with row1_col3:
 
-    st.metric(
-    "Resolution",
-    metrics["resolution"]
-)
-    # -------------------
-    # Processing Time
-    # -------------------
+        st.metric(
+            "Entropy",
+            metrics["entropy"]
+        )
+
+        st.metric(
+            "Sharpness",
+            metrics["sharpness"]
+        )
+
+    row2_col1, row2_col2, row2_col3 = st.columns(3)
+
+    with row2_col1:
+
+        st.metric(
+            "Colorfulness",
+            metrics["colorfulness"]
+        )
+
+    with row2_col2:
+
+        st.metric(
+            "Resolution",
+            metrics["resolution"]
+        )
+
+    with row2_col3:
+
+        st.metric(
+            "Processing Time",
+            f"{metrics['processing_time']} sec"
+        )
+
+    # -----------------------------------
+    # Processing Information
+    # -----------------------------------
 
     st.info(
-        f"Processing Time: {processing_time} seconds"
+        f"⏱ Total Processing Time : {processing_time} seconds"
     )
 
-    # -------------------
-    # Download Button
-    # -------------------
+    # -----------------------------------
+    # Save Metrics
+    # -----------------------------------
 
-    import io
+    metrics_data = {
+
+        "Image Name": uploaded_file.name,
+
+        "Original Brightness":
+            metrics["original_brightness"],
+
+        "Enhanced Brightness":
+            metrics["enhanced_brightness"],
+
+        "Brightness Gain (%)":
+            metrics["brightness_gain"],
+
+        "Contrast Gain (%)":
+            metrics["contrast_gain"],
+
+        "Entropy":
+            metrics["entropy"],
+
+        "Sharpness":
+            metrics["sharpness"],
+
+        "Colorfulness":
+            metrics["colorfulness"],
+
+        "Resolution":
+            metrics["resolution"],
+
+        "Processing Time (s)":
+            metrics["processing_time"]
+
+    }
+
+    os.makedirs(
+        "metrics",
+        exist_ok=True
+    )
+
+    csv_file = "metrics/results.csv"
+
+    df = pd.DataFrame([metrics_data])
+
+    if os.path.exists(csv_file):
+
+        df.to_csv(
+            csv_file,
+            mode="a",
+            header=False,
+            index=False
+        )
+
+    else:
+
+        df.to_csv(
+            csv_file,
+            index=False
+        )
+
+    # -----------------------------------
+    # Download Button
+    # -----------------------------------
 
     buffer = io.BytesIO()
 
@@ -230,42 +383,25 @@ st.image(
     )
 
     st.download_button(
-        label="📥 Download Dehazed Image",
+        label="📥 Download Enhanced Image",
         data=buffer.getvalue(),
-        file_name="dehazed_image.jpg",
+        file_name=f"dehazed_{uploaded_file.name}",
         mime="image/jpeg"
     )
 
-    metrics_data = {
-        "Image Name": uploaded_file.name,
-        "Original Brightness": metrics["original_brightness"],
-        "Enhanced Brightness": metrics["enhanced_brightness"],
-        "Brightness Gain (%)": metrics["brightness_gain"],
-        "Contrast Gain (%)": metrics["contrast_gain"],
-        "Entropy": metrics["entropy"],
-        "Sharpness": metrics["sharpness"],
-        "Colorfulness": metrics["colorfulness"],
-        "Resolution": metrics["resolution"],
-        "Processing Time (s)": metrics["processing_time"]
-    }
+    # -----------------------------------
+    # Completion Message
+    # -----------------------------------
 
-    csv_file = "metrics/results.csv"
+    st.success("✅ Processing Completed Successfully!")
 
-    os.makedirs("metrics", exist_ok=True)
+    # -----------------------------------
+    # Footer
+    # -----------------------------------
 
-    df = pd.DataFrame([metrics_data])
+    st.markdown("---")
 
-    if os.path.exists(csv_file):
-        df.to_csv(
-            csv_file,
-            mode="a",
-            header=False,
-            index=False
-        )
-    else:
-        df.to_csv(
-            csv_file,
-            index=False
-        )
-
-    st.success("Processing Complete!")
+    st.caption(
+        "Nighttime Haze Removal System | Final Year Project | "
+        "Techno India College Of Technology"
+    )
