@@ -13,7 +13,6 @@ from PIL import Image
 from model_runner import run_dehaze
 from src.evaluation.metrics import evaluate_image
 
-
 def benchmark_dataset(
     dataset_folder="dataset_test",
     output_csv="benchmark_results/benchmark.csv"
@@ -73,7 +72,11 @@ def benchmark_dataset(
 
         results.append(metrics)
 
-    df = pd.DataFrame(results)
+        df = pd.DataFrame(results)
+
+    if df.empty:
+        print("No valid images were processed.")
+        return df
 
     columns = [
         "image",
@@ -90,6 +93,41 @@ def benchmark_dataset(
 
     df = df[columns]
 
-    df.to_csv(output_csv, index=False)
+    df.to_csv(
+        output_csv,
+        index=False
+    )
+
+    summary = pd.DataFrame({
+
+        "Metric": [
+            "Images Processed",
+            "Average Brightness Gain (%)",
+            "Average Contrast Gain (%)",
+            "Average Entropy",
+            "Average Sharpness",
+            "Average Colorfulness",
+            "Average Processing Time (s)"
+        ],
+
+        "Value": [
+            len(df),
+            round(df["brightness_gain"].mean(), 2),
+            round(df["contrast_gain"].mean(), 2),
+            round(df["entropy"].mean(), 2),
+            round(df["sharpness"].mean(), 2),
+            round(df["colorfulness"].mean(), 2),
+            round(df["processing_time"].mean(), 2)
+        ]
+
+    })
+
+    summary.to_csv(
+        "benchmark_results/summary.csv",
+        index=False
+    )
+
+    print("\nBenchmark Summary")
+    print(summary)
 
     return df

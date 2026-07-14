@@ -238,7 +238,7 @@ This project extends the research implementation by developing a complete deploy
 
 # 👨‍💻 Developer
 
-**Sweta Mondal**
+**Snehanshu Daripa**
 
 B.Tech – Computer Science & Engineering
 
